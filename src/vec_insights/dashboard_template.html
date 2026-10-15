@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VEC Leaderboard Insights</title>
+<meta name="description" content="Unofficial headroom and rank what-if dashboard for the public Virtual Embryo Challenge leaderboard.">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f5f2; --surface: #fcfcfb; --border: #e3e1dc; --grid: #ebe9e4;
+  --text: #0b0b0b; --text-2: #52514e; --muted: #7a7974;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
+  --ref: #7a7974; --focus: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --border: #2e2d2b; --grid: #262624;
+    --text: #f0efec; --text-2: #c3c2b7; --muted: #94938c;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+    --ref: #94938c; --focus: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --border: #2e2d2b; --grid: #262624;
+  --text: #f0efec; --text-2: #c3c2b7; --muted: #94938c;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+  --ref: #94938c; --focus: #3987e5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 { font-size: 1.1rem; margin: 0 0 4px; }
+p { margin: 0 0 8px; }
+.sub { color: var(--text-2); }
+.small { font-size: 0.85rem; color: var(--muted); }
+a { color: var(--series-1); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; margin-top: 16px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
+.tabs button { font: inherit; font-size: 0.9rem; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
+.tabs button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.tile .k { font-size: 0.8rem; color: var(--text-2); }
+.tile .v { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+.grid2 > .card { margin-top: 16px; min-width: 0; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--text-2); font-size: 11px; font-family: inherit; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--grid); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--text-2); font-weight: 600; }
+.calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 12px 0; }
+.calc label { display: block; font-size: 0.8rem; color: var(--text-2); }
+.calc input { width: 100%; font: inherit; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.result { font-size: 1.05rem; margin: 8px 0; }
+.result b { font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--text-2); margin-top: 6px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+#tip { position: fixed; pointer-events: none; z-index: 10; background: var(--text); color: var(--surface);
+  font-size: 0.8rem; padding: 6px 8px; border-radius: 6px; max-width: 260px; display: none; line-height: 1.35; }
+footer { margin-top: 28px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>VEC Leaderboard Insights</h1>
+  <p class="sub">Where the remaining headline points are on each Virtual Embryo Challenge board, and what a gain on one metric would do to your rank.</p>
+  <p class="small" id="meta"></p>
+
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="tiles" id="tiles"></div>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Headline scores of listed teams</h2>
+      <p class="small">Teams per 1-point bin. Dashed lines: floor (50) and published baselines. Your score appears in orange once you enter it below.</p>
+      <div id="hist"></div>
+    </section>
+    <section class="card">
+      <h2>Headline points still unclaimed</h2>
+      <p class="small">weight × (100 − median of the top 10 teams). The longest bar is the metric where even leading teams leave the most points.</p>
+      <div id="bars"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Where do I stand?</h2>
+    <p class="small">Type the per-metric scores from your submission page (official scale, 50 = floor, 100 = ceiling). The fields start at the field median. Nothing leaves your browser.</p>
+    <div class="calc" id="calc"></div>
+    <div class="result" id="result"></div>
+    <div class="tbl-wrap"><table id="whatif"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Per-metric table</h2>
+    <div class="tbl-wrap"><table id="table"></table></div>
+    <p class="small" id="formula"></p>
+  </section>
+
+  <section class="card">
+    <h2>Trend over snapshots</h2>
+    <div id="trend"></div>
+  </section>
+
+  <footer class="small">
+    <p>Unofficial community tool. It is not affiliated with or endorsed by the organisers. Data comes from the public leaderboard API of
+    <a href="https://virtualembryo.ai/challenge/leaderboard">virtualembryo.ai</a>. Team names, affiliations and model strings are removed before anything is stored.
+    The public board lists up to 200 teams per board, so ranks and percentiles are relative to those teams. Validation ranks can differ from the hidden test set.</p>
+    <p>Source and CLI: <a href="https://github.com/WaelYTz/vec-leaderboard-insights">github.com/WaelYTz/vec-leaderboard-insights</a></p>
+  </footer>
+</main>
+<div id="tip" role="tooltip"></div>
+<script>
+const DATA = /*__DATA__*/null;
+const NS = "http://www.w3.org/2000/svg";
+const keys = Object.keys(DATA.boards);
+let current = keys[0];
+let mine = {};          // board -> {metric: value}
+const fmt = (x, d = 1) => (x === null || x === undefined || Number.isNaN(x)) ? "–" : Number(x).toFixed(d);
+const lab = m => DATA.labels[m] || m;
+const el = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const tip = document.getElementById("tip");
+function showTip(ev, html) {
+  tip.innerHTML = html; tip.style.display = "block";
+  const x = Math.min(ev.clientX + 12, window.innerWidth - tip.offsetWidth - 8);
+  tip.style.left = x + "px"; tip.style.top = (ev.clientY + 14) + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+const median = xs => { const s = [...xs].sort((a, b) => a - b); if (!s.length) return NaN;
+  const p = (s.length - 1) / 2, lo = Math.floor(p), hi = Math.ceil(p); return s[lo] + (s[hi] - s[lo]) * (p - lo); };
+
+document.getElementById("meta").textContent =
+  `Snapshot ${DATA.fetched_at.replace("T", " ").replace("+00:00", " UTC")} · phase ${DATA.phase.label || DATA.phase.phase}`;
+
+function tabs() {
+  const t = document.getElementById("tabs"); t.innerHTML = "";
+  for (const k of keys) {
+    const b = document.createElement("button");
+    b.textContent = k; b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", k === current);
+    b.title = DATA.boards[k].label;
+    b.onclick = () => { current = k; render(); };
+    t.appendChild(b);
+  }
+}
+
+function tiles(B) {
+  const s = B.summary;
+  const base = Object.entries(s.baselines);
+  const best = base.length ? base.reduce((a, b) => (b[1] > a[1] ? b : a)) : null;
+  const items = [
+    ["Teams listed", s.teams_listed, 0],
+    ["Best", s.best, 2],
+    ["10th place", s.rank_10, 2],
+    ["Median listed", s.median, 2],
+    ["Above floor (50)", s.above_floor, 0],
+    [best ? `Baseline ${best[0]}` : "Published baseline", best ? best[1] : null, 2],
+  ];
+  document.getElementById("tiles").innerHTML = items.map(([k, v, d]) =>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${fmt(v, d)}</div></div>`).join("");
+}
+
+function headlineOf(B, vals) {
+  let h = 0; for (const [m, w] of Object.entries(B.weights)) h += w * (vals[m] ?? 50); return h;
+}
+const rankOf = (B, h) => 1 + B.rows.filter(r => r.h > h + 1e-9).length;
+
+function hist(B) {
+  const host = document.getElementById("hist"); host.innerHTML = "";
+  const W = 480, H = 230, m = { l: 34, r: 10, t: 14, b: 30 };
+  const hs = B.rows.map(r => r.h);
+  const refs = [{ name: "floor", v: 50 }, ...Object.entries(B.summary.baselines).map(([n, v]) => ({ name: n, v }))];
+  const you = mine[current] ? headlineOf(B, mine[current]) : null;
+  const lo = Math.floor(Math.min(50, ...hs, ...refs.map(r => r.v), you ?? 100)) - 1;
+  const hi = Math.ceil(Math.max(...hs, you ?? 0)) + 1;
+  const bins = []; for (let x = lo; x < hi; x++) bins.push({ x, n: 0 });
+  for (const h of hs) { const i = Math.min(bins.length - 1, Math.floor(h) - lo); if (i >= 0) bins[i].n++; }
+  const maxN = Math.max(1, ...bins.map(b => b.n));
+  const X = v => m.l + (v - lo) / (hi - lo) * (W - m.l - m.r);
+  const Y = n => H - m.b - n / maxN * (H - m.t - m.b);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Histogram of headline scores" }, host);
+  for (let i = 0; i <= 4; i++) {
+    const n = Math.round(maxN * i / 4), y = Y(n);
+    el("line", { x1: m.l, x2: W - m.r, y1: y, y2: y, stroke: "var(--grid)" }, svg);
+    el("text", { x: m.l - 6, y: y + 4, "text-anchor": "end" }, svg).textContent = n;
+  }
+  const step = Math.max(1, Math.round((hi - lo) / 8));
+  for (let x = lo; x <= hi; x += step) el("text", { x: X(x), y: H - m.b + 16, "text-anchor": "middle" }, svg).textContent = x;
+  const bw = (W - m.l - m.r) / (hi - lo);
+  for (const b of bins) {
+    if (!b.n) continue;
+    const y = Y(b.n), x = X(b.x) + 1, w = Math.max(1, bw - 2), h = H - m.b - y;
+    const r = Math.min(4, w / 2, h);
+    el("path", { d: `M${x},${H - m.b} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${H - m.b} Z`,
+      fill: "var(--series-1)" }, svg);
+    const hit = el("rect", { x: X(b.x), y: m.t, width: bw, height: H - m.t - m.b, fill: "transparent" }, svg);
+    hit.addEventListener("mousemove", ev => showTip(ev, `<b>${b.x}–${b.x + 1}</b><br>${b.n} team${b.n > 1 ? "s" : ""}`));
+    hit.addEventListener("mouseleave", hideTip);
+  }
+  refs.forEach(r => {
+    const x = X(r.v);
+    const ln = el("line", { x1: x, x2: x, y1: m.t, y2: H - m.b, stroke: "var(--ref)", "stroke-dasharray": "4 3", "stroke-width": 1.5 }, svg);
+    ln.addEventListener("mousemove", ev => showTip(ev, `<b>${r.name}</b> ${fmt(r.v, 2)}`));
+    ln.addEventListener("mouseleave", hideTip);
+  });
+  const lg = document.createElement("div"); lg.className = "legend";
+  lg.innerHTML = `<span><i style="background:var(--series-1)"></i>listed teams</span>` +
+    refs.map(r => `<span><i style="background:none;border-top:2px dashed var(--ref);height:0"></i>${r.name} ${fmt(r.v, 1)}</span>`).join("") +
+    (you !== null ? `<span><i style="background:var(--series-2)"></i>you ${fmt(you, 2)}</span>` : "");
+  if (you !== null) {
+    const x = X(you);
+    el("line", { x1: x, x2: x, y1: m.t, y2: H - m.b, stroke: "var(--series-2)", "stroke-width": 2 }, svg);
+    const t = el("text", { x: x - 4, y: m.t + 10, "text-anchor": "end", style: "fill: var(--text); font-weight: 600" }, svg);
+    t.textContent = `you ${fmt(you, 2)}`;
+    if (x - m.l < 70) { t.setAttribute("x", x + 4); t.setAttribute("text-anchor", "start"); }
+  }
+  el("line", { x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b, stroke: "var(--border)" }, svg);
+  host.appendChild(lg);
+}
+
+function bars(B) {
+  const host = document.getElementById("bars"); host.innerHTML = "";
+  const hr = [...B.headroom].sort((a, b) => b.unclaimed - a.unclaimed);
+  const W = 480, rowH = 26, m = { l: 190, r: 46, t: 4, b: 4 };
+  const H = m.t + m.b + rowH * hr.length;
+  const maxV = Math.max(...hr.map(h => h.unclaimed), 0.5);
+  const X = v => m.l + v / maxV * (W - m.l - m.r);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Unclaimed headline points per metric" }, host);
+  hr.forEach((h, i) => {
+    const y = m.t + i * rowH, bh = 14, by = y + (rowH - bh) / 2, w = Math.max(1, X(h.unclaimed) - m.l);
+    el("text", { x: m.l - 8, y: by + 11, "text-anchor": "end" }, svg).textContent = lab(h.metric);
+    const r = Math.min(4, w / 2);
+    el("path", { d: `M${m.l},${by} H${m.l + w - r} Q${m.l + w},${by} ${m.l + w},${by + r} V${by + bh - r} Q${m.l + w},${by + bh} ${m.l + w - r},${by + bh} H${m.l} Z`,
+      fill: "var(--series-1)" }, svg);
+    el("text", { x: m.l + w + 6, y: by + 11, style: "fill: var(--text)" }, svg).textContent = fmt(h.unclaimed, 2);
+    const hit = el("rect", { x: 0, y, width: W, height: rowH, fill: "transparent" }, svg);
+    hit.addEventListener("mousemove", ev => showTip(ev,
+      `<b>${lab(h.metric)}</b> (${h.metric})<br>weight ${fmt(h.weight, 3)}<br>top-10 median ${fmt(h.top_median)} · best ${fmt(h.best)}<br>field median ${fmt(h.field_median)}<br>unclaimed ${fmt(h.unclaimed, 2)} headline pts`));
+    hit.addEventListener("mouseleave", hideTip);
+  });
+}
+
+function table(B) {
+  const names = Object.keys(B.summary.baselines);
+  const hr = [...B.headroom].sort((a, b) => b.unclaimed - a.unclaimed);
+  const head = ["Metric", "Weight", "Field median", "Top-10 median", "Best", "At 100", "Below 50", ...names, "Unclaimed", "Spread"];
+  const rows = hr.map(h => [
+    `${lab(h.metric)} <span class="small">${h.metric}</span>`, fmt(h.weight, 3), fmt(h.field_median), fmt(h.top_median), fmt(h.best),
+    Math.round(100 * h.at_ceiling_share) + "%", Math.round(100 * h.below_floor_share) + "%",
+    ...names.map(n => fmt(h.baselines[n])), fmt(h.unclaimed, 2), fmt(h.spread, 2)]);
+  document.getElementById("table").innerHTML =
+    `<thead><tr>${head.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>`;
+  const f = B.formula;
+  document.getElementById("formula").textContent =
+    `Spread = weight × (p90 − p10) over listed teams. Formula check: the published weights reproduce ${f.rows - f["rows_off_by_more_than_0.01"]}/${f.rows} headlines on this board to 0.01 (max deviation ${fmt(f.max_abs_error, 3)}).`;
+}
+
+function calc(B) {
+  const host = document.getElementById("calc"); host.innerHTML = "";
+  if (!mine[current]) {
+    mine[current] = {};
+    for (const h of B.headroom) mine[current][h.metric] = +h.field_median.toFixed(1);
+  }
+  for (const h of B.headroom) {
+    const id = "in_" + h.metric;
+    const d = document.createElement("div");
+    d.innerHTML = `<label for="${id}">${lab(h.metric)} · w ${fmt(h.weight, 3)}</label><input id="${id}" type="number" step="0.1" min="0" max="100" value="${mine[current][h.metric]}">`;
+    d.querySelector("input").addEventListener("input", e => {
+      const v = parseFloat(e.target.value); mine[current][h.metric] = Number.isFinite(v) ? Math.min(100, v) : 50;
+      whatif(B); hist(B);
+    });
+    host.appendChild(d);
+  }
+  whatif(B);
+}
+
+function whatif(B) {
+  const vals = mine[current], h = headlineOf(B, vals), rank = rankOf(B, h), n = B.rows.length;
+  const hs = B.rows.map(r => r.h).sort((a, b) => b - a);
+  const need = [1, 10, 50].filter(k => hs.length >= k).map(k => `top ${k}: +${fmt(Math.max(0, hs[k - 1] - h + 1e-4), 2)}`);
+  document.getElementById("result").innerHTML =
+    `Headline <b>${fmt(h, 2)}</b> → estimated rank <b>${rank}</b> of ${n} listed. <span class="small">Points needed: ${need.join(" · ")}</span>`;
+  const STEP = 5;
+  const rows = Object.entries(B.weights).map(([m, w]) => {
+    const y = vals[m] ?? 50, nv = Math.min(100, y + STEP), gain = w * (nv - y);
+    const col = B.rows.map(r => r.m[m]).filter(v => v !== undefined);
+    const pct = 100 * col.filter(v => v <= y).length / col.length;
+    return { m, w, y, pct, gain, nr: rankOf(B, h + gain) };
+  }).sort((a, b) => b.gain - a.gain);
+  document.getElementById("whatif").innerHTML =
+    `<thead><tr><th>If you gain +${STEP} on…</th><th>Your value</th><th>Percentile</th><th>Headline gain</th><th>New est. rank</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td>${lab(r.m)}</td><td>${fmt(r.y)}</td><td>${Math.round(r.pct)}%</td><td>+${fmt(r.gain, 2)}</td><td>${r.nr}${r.nr < rank ? ` <span class="small">(↑${rank - r.nr})</span>` : ""}</td></tr>`).join("") + "</tbody>";
+}
+
+function trend() {
+  const host = document.getElementById("trend"); host.innerHTML = "";
+  const H0 = (DATA.history || {})[current] || [];
+  if (H0.length < 2) {
+    host.innerHTML = `<p class="small">Only ${H0.length} snapshot${H0.length === 1 ? "" : "s"} for this board so far. A daily GitHub Action adds one per day, and the trend fills in as they accumulate.</p>`;
+    return;
+  }
+  const series = [["best", "Best", "var(--series-1)"], ["rank_10", "10th place", "var(--series-2)"], ["median", "Median listed", "var(--series-3)"]];
+  const W = 960, H = 240, m = { l: 36, r: 90, t: 12, b: 28 };
+  const ts = H0.map(p => Date.parse(p.fetched_at));
+  const vs = H0.flatMap(p => series.map(s => p[s[0]])).filter(v => v !== null);
+  const lo = Math.floor(Math.min(...vs)) - 1, hi = Math.ceil(Math.max(...vs)) + 1;
+  const X = t => m.l + (t - ts[0]) / Math.max(1, ts[ts.length - 1] - ts[0]) * (W - m.l - m.r);
+  const Y = v => H - m.b - (v - lo) / (hi - lo) * (H - m.t - m.b);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Trend of best, 10th and median headline" }, host);
+  for (let i = 0; i <= 4; i++) { const v = lo + (hi - lo) * i / 4, y = Y(v);
+    el("line", { x1: m.l, x2: W - m.r, y1: y, y2: y, stroke: "var(--grid)" }, svg);
+    el("text", { x: m.l - 6, y: y + 4, "text-anchor": "end" }, svg).textContent = fmt(v, 0); }
+  [0, H0.length - 1].forEach(i => el("text", { x: X(ts[i]), y: H - 8, "text-anchor": i ? "end" : "start" }, svg).textContent = H0[i].fetched_at.slice(0, 10));
+  for (const [k, name, c] of series) {
+    const pts = H0.map((p, i) => p[k] === null ? null : [X(ts[i]), Y(p[k])]).filter(Boolean);
+    el("path", { d: "M" + pts.map(p => p.join(",")).join(" L"), fill: "none", stroke: c, "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+    const last = pts[pts.length - 1];
+    el("text", { x: last[0] + 6, y: last[1] + 4, style: "fill: var(--text)" }, svg).textContent = name;
+  }
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: "var(--ref)", visibility: "hidden" }, svg);
+  const hit = el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" }, svg);
+  hit.addEventListener("mousemove", ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * W;
+    let i = 0; ts.forEach((t, j) => { if (Math.abs(X(t) - px) < Math.abs(X(ts[i]) - px)) i = j; });
+    cross.setAttribute("x1", X(ts[i])); cross.setAttribute("x2", X(ts[i])); cross.setAttribute("visibility", "visible");
+    const p = H0[i];
+    showTip(ev, `<b>${p.fetched_at.slice(0, 16).replace("T", " ")}</b><br>` + series.map(s => `${s[1]}: ${fmt(p[s[0]], 2)}`).join("<br>") + `<br>teams listed: ${p.teams_listed}`);
+  });
+  hit.addEventListener("mouseleave", () => { cross.setAttribute("visibility", "hidden"); hideTip(); });
+  const lg = document.createElement("div"); lg.className = "legend";
+  lg.innerHTML = series.map(s => `<span><i style="background:${s[2]}"></i>${s[1]}</span>`).join("");
+  host.appendChild(lg);
+}
+
+function render() {
+  const B = DATA.boards[current];
+  tabs(); tiles(B); calc(B); hist(B); bars(B); table(B); trend();
+}
+render();
+</script>
+</body>
+</html>
