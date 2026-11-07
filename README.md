@@ -1,5 +1,13 @@
 # VEC Leaderboard Insights
 
+<p>
+  <img alt="top language" src="https://img.shields.io/github/languages/top/WaelYTz/vec-leaderboard-insights?style=flat-square">
+  <img alt="last commit" src="https://img.shields.io/github/last-commit/WaelYTz/vec-leaderboard-insights?style=flat-square">
+  <img alt="repo size" src="https://img.shields.io/github/repo-size/WaelYTz/vec-leaderboard-insights?style=flat-square">
+  <img alt="license" src="https://img.shields.io/github/license/WaelYTz/vec-leaderboard-insights?style=flat-square">
+</p>
+
+
 **Which metric should I improve next, and what is it worth in rank?**
 
 This is a small, dependency-free tool for participants of the
